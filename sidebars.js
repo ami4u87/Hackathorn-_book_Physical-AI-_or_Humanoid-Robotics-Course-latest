@@ -1,5 +1,5 @@
 module.exports = {
-  docs: [
+  docsSidebar: [
     {
       type: 'doc',
       id: 'intro',
@@ -9,13 +9,13 @@ module.exports = {
       label: 'Module 1: ROS 2 Fundamentals',
       items: [
         'module-1-ros2/index',
-        'module-1-ros2/1-installation',
-        'module-1-ros2/2-pubsub',
-        'module-1-ros2/3-services',
-        'module-1-ros2/4-actions',
-        'module-1-ros2/5-parameters',
-        'module-1-ros2/6-launch',
-        'module-1-ros2/7-tf2',
+        'module-1-ros2/installation',
+        'module-1-ros2/pubsub',
+        'module-1-ros2/services',
+        'module-1-ros2/actions',
+        'module-1-ros2/parameters',
+        'module-1-ros2/launch',
+        'module-1-ros2/tf2',
         'module-1-ros2/exercises'
       ],
     },
@@ -47,9 +47,5 @@ module.exports = {
         'module-5-capstone/index',
       ],
     },
-    {
-      type: 'doc',
-      id: 'glossary',
-    }
   ],
 };

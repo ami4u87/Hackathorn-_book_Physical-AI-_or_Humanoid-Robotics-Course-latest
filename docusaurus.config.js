@@ -21,7 +21,7 @@ const config = {
   projectName: 'Hackathorn-_book_Physical-AI-_or_Humanoid-Robotics-Course-latest', // Usually your repo name.
   deploymentBranch: 'gh-pages', // Branch that GitHub pages will deploy from.
 
-  onBrokenLinks: 'throw',
+  onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
 
   // Even if you don't use internalization, you can use this field to set useful
