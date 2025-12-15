@@ -1,0 +1,39 @@
+{
+    "names": {
+        "publisher_example": {
+            "cmake-args": [
+                "-DCMAKE_BUILD_TYPE=Release"
+            ]
+        },
+        "subscriber_example": {
+            "cmake-args": [
+                "-DCMAKE_BUILD_TYPE=Release"
+            ]
+        },
+        "service_example": {
+            "cmake-args": [
+                "-DCMAKE_BUILD_TYPE=Release"
+            ]
+        },
+        "action_example": {
+            "cmake-args": [
+                "-DCMAKE_BUILD_TYPE=Release"
+            ]
+        },
+        "param_example": {
+            "cmake-args": [
+                "-DCMAKE_BUILD_TYPE=Release"
+            ]
+        },
+        "launch_example": {
+            "cmake-args": [
+                "-DCMAKE_BUILD_TYPE=Release"
+            ]
+        },
+        "tf2_example": {
+            "cmake-args": [
+                "-DCMAKE_BUILD_TYPE=Release"
+            ]
+        }
+    }
+}

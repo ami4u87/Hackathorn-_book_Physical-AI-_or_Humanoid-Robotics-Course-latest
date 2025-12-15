@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  ros2-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.ros2-humble-gazebo
+      cache_from:
+        - ros2-humble-gazebo-ci:latest
+    image: ros2-humble-gazebo-ci:latest
+    container_name: ros2-humble-dev
+    volumes:
+      - .:/workspace/src/humanoid_robotics:rw
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    environment:
+      - DISPLAY=${DISPLAY:-:1}
+      - QT_X11_NO_MITSHM=1
+      - LIBGL_ALWAYS_SOFTWARE=1
+      - GZ_SIM_RESOURCE_PATH=/usr/share/gazebo
+    stdin_open: true
+    tty: true
+    network_mode: host
+    privileged: true
+    command: bash
+
+  ros2-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.ros2-humble-gazebo
+    image: ros2-humble-gazebo-ci:latest
+    container_name: ros2-humble-test
+    volumes:
+      - .:/workspace/src/humanoid_robotics:rw
+      - ./test_results:/workspace/test_results:rw
+    environment:
+      - DISPLAY=:99
+      - QT_X11_NO_MITSHM=1
+      - LIBGL_ALWAYS_SOFTWARE=1
+      - GZ_SIM_RESOURCE_PATH=/usr/share/gazebo
+    command: >
+      bash -c "
+        Xvfb :99 -screen 0 1920x1080x24 &
+        sleep 2 &&
+        source /opt/ros/humble/setup.bash &&
+        colcon build &&
+        source install/setup.bash &&
+        colcon test --event-handlers console_direct+ &&
+        colcon test-result --all --verbose
+      "
+
+  gazebo-headless:
+    build:
+      context: .
+      dockerfile: Dockerfile.ros2-humble-gazebo
+    image: ros2-humble-gazebo-ci:latest
+    container_name: gazebo-headless-sim
+    volumes:
+      - .:/workspace/src/humanoid_robotics:rw
+    environment:
+      - DISPLAY=:99
+      - QT_X11_NO_MITSHM=1
+      - LIBGL_ALWAYS_SOFTWARE=1
+      - GZ_SIM_RESOURCE_PATH=/usr/share/gazebo
+      - IGN_GAZEBO_SYSTEM_PLUGIN_PATH=/opt/ros/humble/lib
+    command: >
+      bash -c "
+        Xvfb :99 -screen 0 1920x1080x24 &
+        sleep 2 &&
+        source /opt/ros/humble/setup.bash &&
+        gz sim -s -r -v 4 --iterations 1000 empty.sdf
+      "

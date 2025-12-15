@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Launch file for launch example node -->
+  <arg name="publish_rate" default="2.0"/>
+  <arg name="topic_name" default="launch_example_xml_topic"/>
+
+  <node pkg="launch_example" exec="launch_node" name="launch_node_xml" output="screen">
+    <param name="publish_rate" value="$(var publish_rate)"/>
+    <param name="topic_name" value="$(var topic_name)"/>
+  </node>
+</launch>

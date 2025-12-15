@@ -1,0 +1,32 @@
+name: Test Chatbot Accuracy
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python-version: [3.11]
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest
+        if [ -f backend/chatbot/requirements.txt ]; then pip install -r backend/chatbot/requirements.txt; fi
+
+    - name: Run chatbot accuracy tests
+      run: |
+        if [ -f scripts/test_chatbot_accuracy.py ]; then
+          python scripts/test_chatbot_accuracy.py --ground-truth tests/module1_qa.json
+        else
+          echo "Chatbot accuracy test script not found, skipping"
+        fi

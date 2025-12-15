@@ -1,0 +1,345 @@
+openapi: 3.0.3
+info:
+  title: OpenAI API Proxy
+  description: Rate-limited proxy for OpenAI API with JWT authentication and usage logging
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8001
+    description: Local development
+  - url: https://api-proxy.course.university.edu
+    description: Production
+
+paths:
+  /v1/chat/completions:
+    post:
+      summary: Proxy to OpenAI Chat Completions API
+      description: |
+        Forwards request to OpenAI with rate limiting and usage logging.
+        Requires JWT authentication. Enforces 100 requests/day quota per student.
+      operationId: chatCompletions
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatCompletionRequest'
+      responses:
+        '200':
+          description: Successful OpenAI API response
+          headers:
+            X-Quota-Remaining:
+              schema:
+                type: integer
+              description: Requests remaining in daily quota
+            X-Quota-Reset:
+              schema:
+                type: string
+                format: date-time
+              description: When quota resets (UTC midnight)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatCompletionResponse'
+        '401':
+          description: Invalid or expired JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          headers:
+            X-Quota-Remaining:
+              schema:
+                type: integer
+                example: 0
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds until quota resets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: OpenAI API unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/embeddings:
+    post:
+      summary: Proxy to OpenAI Embeddings API
+      description: Generate text embeddings with rate limiting
+      operationId: createEmbeddings
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbeddingRequest'
+      responses:
+        '200':
+          description: Successful embedding generation
+          headers:
+            X-Quota-Remaining:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingResponse'
+        '401':
+          $ref: '#/paths/~1v1~1chat~1completions/post/responses/401'
+        '429':
+          $ref: '#/paths/~1v1~1chat~1completions/post/responses/429'
+
+  /auth/token:
+    post:
+      summary: Issue JWT token for student
+      description: Instructor endpoint to generate JWT for student ID
+      operationId: issueToken
+      security:
+        - InstructorAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+      responses:
+        '200':
+          description: JWT issued successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Invalid instructor credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /usage/{student_id}:
+    get:
+      summary: Get usage statistics for student
+      description: Instructor endpoint for monitoring student API usage
+      operationId: getUsage
+      security:
+        - InstructorAuth: []
+      parameters:
+        - name: student_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Student identifier
+      responses:
+        '200':
+          description: Usage statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageResponse'
+        '401':
+          description: Unauthorized (instructor auth required)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    ChatCompletionRequest:
+      type: object
+      required:
+        - model
+        - messages
+      properties:
+        model:
+          type: string
+          enum: [gpt-4-turbo, gpt-4o, gpt-4o-mini]
+          example: "gpt-4-turbo"
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+                enum: [system, user, assistant]
+              content:
+                type: string
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          default: 0.7
+        max_tokens:
+          type: integer
+          minimum: 1
+          maximum: 4096
+          default: 1024
+
+    ChatCompletionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          example: "chat.completion"
+        created:
+          type: integer
+        model:
+          type: string
+        choices:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              message:
+                type: object
+                properties:
+                  role:
+                    type: string
+                  content:
+                    type: string
+              finish_reason:
+                type: string
+        usage:
+          type: object
+          properties:
+            prompt_tokens:
+              type: integer
+            completion_tokens:
+              type: integer
+            total_tokens:
+              type: integer
+
+    EmbeddingRequest:
+      type: object
+      required:
+        - model
+        - input
+      properties:
+        model:
+          type: string
+          enum: [text-embedding-3-small, text-embedding-3-large]
+          example: "text-embedding-3-large"
+        input:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+
+    EmbeddingResponse:
+      type: object
+      properties:
+        object:
+          type: string
+          example: "list"
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              object:
+                type: string
+                example: "embedding"
+              index:
+                type: integer
+              embedding:
+                type: array
+                items:
+                  type: number
+        model:
+          type: string
+        usage:
+          type: object
+          properties:
+            prompt_tokens:
+              type: integer
+            total_tokens:
+              type: integer
+
+    TokenRequest:
+      type: object
+      required:
+        - student_id
+      properties:
+        student_id:
+          type: string
+          example: "student-12345"
+        quota_daily:
+          type: integer
+          default: 100
+          description: Custom daily quota (optional)
+
+    TokenResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT token (valid for 1 semester)
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        expires_at:
+          type: string
+          format: date-time
+          description: Token expiration timestamp
+
+    UsageResponse:
+      type: object
+      properties:
+        student_id:
+          type: string
+        quota_daily:
+          type: integer
+        quota_used_today:
+          type: integer
+        quota_remaining:
+          type: integer
+        last_request:
+          type: string
+          format: date-time
+        total_requests:
+          type: integer
+        total_cost_usd:
+          type: number
+          format: float
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+  securitySchemes:
+    JWTAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Student JWT token (obtained from instructor)
+    InstructorAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Instructor JWT token (admin privileges)

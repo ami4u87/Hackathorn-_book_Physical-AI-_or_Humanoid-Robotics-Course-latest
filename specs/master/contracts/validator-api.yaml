@@ -1,0 +1,149 @@
+openapi: 3.0.3
+info:
+  title: Exercise Validator API
+  description: Optional server endpoint for exercise validation hash submission (LMS integration)
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8002
+    description: Local development
+  - url: https://validator.course.university.edu
+    description: Production
+
+paths:
+  /validate/submit:
+    post:
+      summary: Submit exercise validation hash
+      description: |
+        Students submit SHA-256 hash from local validation script for grading.
+        Hash is verified against instructor's expected solution hash.
+      operationId: submitValidation
+      security:
+        - JWTAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidationSubmission'
+      responses:
+        '200':
+          description: Validation hash recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResponse'
+        '400':
+          description: Invalid submission (malformed hash, expired timestamp)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /validate/status/{student_id}/{exercise_id}:
+    get:
+      summary: Check validation status for exercise
+      description: Student or instructor checks if exercise has been validated
+      operationId: getValidationStatus
+      security:
+        - JWTAuth: []
+      parameters:
+        - name: student_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: exercise_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Validation status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+
+components:
+  schemas:
+    ValidationSubmission:
+      type: object
+      required:
+        - exercise_id
+        - validation_hash
+        - timestamp
+      properties:
+        exercise_id:
+          type: string
+          description: Exercise identifier (e.g., "module1-ex1-pubsub")
+          example: "module1-ex1-pubsub"
+        validation_hash:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+          description: SHA-256 hash from validation script
+          example: "a1b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890"
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp from validation script (UTC)
+          example: "2025-12-15T10:30:00Z"
+        attempt_number:
+          type: integer
+          minimum: 1
+          description: How many times student has attempted this exercise
+          example: 2
+
+    ValidationResponse:
+      type: object
+      properties:
+        submission_id:
+          type: string
+          format: uuid
+        is_correct:
+          type: boolean
+          description: Whether hash matches expected solution
+        message:
+          type: string
+          example: "Validation successful! Exercise marked as complete."
+        attempt_number:
+          type: integer
+
+    StatusResponse:
+      type: object
+      properties:
+        exercise_id:
+          type: string
+        student_id:
+          type: string
+        is_completed:
+          type: boolean
+        attempts:
+          type: integer
+        last_submission:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+  securitySchemes:
+    JWTAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

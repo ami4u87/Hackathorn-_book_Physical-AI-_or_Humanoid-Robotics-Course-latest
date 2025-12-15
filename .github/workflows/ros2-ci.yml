@@ -1,0 +1,287 @@
+name: ROS 2 Humble CI with Gazebo
+
+on:
+  push:
+    branches: [ master, main, develop ]
+  pull_request:
+    branches: [ master, main, develop ]
+  workflow_dispatch:
+
+env:
+  ROS_DISTRO: humble
+  DOCKER_IMAGE: ros2-humble-gazebo-ci
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ hashFiles('Dockerfile.ros2-humble-gazebo') }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.ros2-humble-gazebo
+          push: false
+          load: true
+          tags: ${{ env.DOCKER_IMAGE }}:latest
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      # Temp fix for cache cleanup
+      # https://github.com/docker/build-push-action/issues/252
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      - name: Run build in Docker
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace/src/${{ github.event.repository.name }} \
+            -w /workspace \
+            ${{ env.DOCKER_IMAGE }}:latest \
+            bash -c "
+              set -e
+              source /opt/ros/${{ env.ROS_DISTRO }}/setup.bash
+              colcon build \
+                --cmake-args -DCMAKE_BUILD_TYPE=Release \
+                --event-handlers console_direct+ \
+                --base-paths src/${{ github.event.repository.name }}
+            "
+
+      - name: Run tests with headless Gazebo
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace/src/${{ github.event.repository.name }} \
+            -v ${{ github.workspace }}/test_results:/workspace/test_results \
+            -w /workspace \
+            -e DISPLAY=:99 \
+            -e QT_X11_NO_MITSHM=1 \
+            -e LIBGL_ALWAYS_SOFTWARE=1 \
+            -e GZ_SIM_RESOURCE_PATH=/usr/share/gazebo \
+            ${{ env.DOCKER_IMAGE }}:latest \
+            bash -c "
+              set -e
+
+              # Start Xvfb for headless rendering
+              Xvfb :99 -screen 0 1920x1080x24 &
+              export DISPLAY=:99
+              sleep 2
+
+              # Source ROS 2 and workspace
+              source /opt/ros/${{ env.ROS_DISTRO }}/setup.bash
+              source install/setup.bash
+
+              # Run colcon test with timeout
+              colcon test \
+                --event-handlers console_direct+ \
+                --return-code-on-test-failure \
+                --pytest-args -v \
+                --base-paths src/${{ github.event.repository.name }}
+
+              # Generate test results summary
+              colcon test-result --all --verbose
+
+              # Copy test results for artifact upload
+              mkdir -p /workspace/test_results
+              cp -r build/*/test_results/* /workspace/test_results/ || true
+            "
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results
+          path: test_results/
+          retention-days: 30
+
+      - name: Publish test results to GitHub
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: |
+            test_results/**/*.xml
+            test_results/**/*.junit.xml
+          check_name: ROS 2 Test Results
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: build-artifacts
+          path: |
+            build/
+            log/
+          retention-days: 7
+
+  integration-tests:
+    runs-on: ubuntu-22.04
+    needs: build-and-test
+    timeout-minutes: 90
+
+    strategy:
+      matrix:
+        test-suite:
+          - name: basic-pub-sub
+            timeout: 30
+          - name: services-actions
+            timeout: 45
+          - name: gazebo-simulation
+            timeout: 90
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ hashFiles('Dockerfile.ros2-humble-gazebo') }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.ros2-humble-gazebo
+          push: false
+          load: true
+          tags: ${{ env.DOCKER_IMAGE }}:latest
+          cache-from: type=local,src=/tmp/.buildx-cache
+
+      - name: Run integration test suite - ${{ matrix.test-suite.name }}
+        timeout-minutes: ${{ matrix.test-suite.timeout }}
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace/src/${{ github.event.repository.name }} \
+            -v ${{ github.workspace }}/integration_results:/workspace/integration_results \
+            -w /workspace \
+            -e DISPLAY=:99 \
+            -e QT_X11_NO_MITSHM=1 \
+            -e LIBGL_ALWAYS_SOFTWARE=1 \
+            -e GZ_SIM_RESOURCE_PATH=/usr/share/gazebo \
+            ${{ env.DOCKER_IMAGE }}:latest \
+            bash -c "
+              set -e
+
+              # Start Xvfb
+              Xvfb :99 -screen 0 1920x1080x24 &
+              export DISPLAY=:99
+              sleep 2
+
+              # Source environments
+              source /opt/ros/${{ env.ROS_DISTRO }}/setup.bash
+
+              # Build workspace
+              colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
+              source install/setup.bash
+
+              # Run specific integration test suite
+              ./src/${{ github.event.repository.name }}/scripts/run_integration_tests.sh \
+                --suite ${{ matrix.test-suite.name }} \
+                --timeout ${{ matrix.test-suite.timeout }} \
+                --output /workspace/integration_results
+            "
+
+      - name: Upload integration test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: integration-results-${{ matrix.test-suite.name }}
+          path: integration_results/
+          retention-days: 30
+
+  code-coverage:
+    runs-on: ubuntu-22.04
+    needs: build-and-test
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ hashFiles('Dockerfile.ros2-humble-gazebo') }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.ros2-humble-gazebo
+          push: false
+          load: true
+          tags: ${{ env.DOCKER_IMAGE }}:latest
+          cache-from: type=local,src=/tmp/.buildx-cache
+
+      - name: Run tests with coverage
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace/src/${{ github.event.repository.name }} \
+            -v ${{ github.workspace }}/coverage:/workspace/coverage \
+            -w /workspace \
+            -e DISPLAY=:99 \
+            ${{ env.DOCKER_IMAGE }}:latest \
+            bash -c "
+              set -e
+
+              # Start Xvfb
+              Xvfb :99 -screen 0 1920x1080x24 &
+              sleep 2
+
+              source /opt/ros/${{ env.ROS_DISTRO }}/setup.bash
+
+              # Build with coverage flags
+              colcon build \
+                --cmake-args -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS='--coverage' \
+                --base-paths src/${{ github.event.repository.name }}
+
+              source install/setup.bash
+
+              # Run tests
+              colcon test \
+                --pytest-args '--cov --cov-report=xml --cov-report=html'
+
+              # Collect coverage data
+              mkdir -p /workspace/coverage
+              find build -name '*.gcda' -exec cp {} /workspace/coverage/ \\;
+              cp -r build/*/coverage.xml /workspace/coverage/ || true
+            "
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          directory: ./coverage
+          flags: ros2-tests
+          fail_ci_if_error: false

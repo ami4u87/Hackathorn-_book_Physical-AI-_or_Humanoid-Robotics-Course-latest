@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+
+# Environment
+.env*
+venv/
+env/
+ENV/
+
+# Git
+.git/
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
+!Dockerfile*
+
+# Coverage
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+
+# ROS 2
+install/
+build/
+log/
+.develset
+AMENT_IGNORE
+COLCON_IGNORE
+
+# Docusaurus/Node.js
+dist/
+build/
+.nyc_output
+coverage/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*.swo

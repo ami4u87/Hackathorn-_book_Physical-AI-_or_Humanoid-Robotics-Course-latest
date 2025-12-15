@@ -1,0 +1,234 @@
+openapi: 3.0.3
+info:
+  title: RAG Chatbot API
+  description: Grounded chatbot API for Physical AI course book queries
+  version: 1.0.0
+  contact:
+    name: Course Development Team
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+  - url: https://chatbot.course.university.edu
+    description: Production
+
+paths:
+  /query:
+    post:
+      summary: Submit a question to the RAG chatbot
+      description: |
+        Retrieve relevant book content and generate grounded answer with citations.
+        Rate limited to 100 requests/day per student.
+      operationId: queryChat bot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+      responses:
+        '200':
+          description: Successful query with grounded answer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponse'
+        '400':
+          description: Invalid query (empty text, malformed JSON)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded (100 requests/day)
+          headers:
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+              description: Requests remaining in quota
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+              description: Unix timestamp when quota resets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error (OpenAI API failure, Qdrant unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /feedback:
+    post:
+      summary: Submit feedback on a chatbot response
+      description: Optional user feedback (1-5 rating + comment) for analytics
+      operationId: submitFeedback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackRequest'
+      responses:
+        '200':
+          description: Feedback recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Feedback recorded successfully"
+        '400':
+          description: Invalid feedback (missing query_id, invalid rating)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    QueryRequest:
+      type: object
+      required:
+        - query_text
+      properties:
+        query_text:
+          type: string
+          description: User's question (max 500 characters)
+          minLength: 1
+          maxLength: 500
+          example: "How do I create a ROS 2 publisher in Python?"
+        student_id:
+          type: string
+          description: Anonymous student ID (optional; for analytics)
+          example: "student-12345"
+        module_filter:
+          type: string
+          description: Limit retrieval to specific module (e.g., "module-1-ros2")
+          example: "module-1-ros2"
+
+    QueryResponse:
+      type: object
+      required:
+        - query_id
+        - response_text
+        - citations
+        - response_time_ms
+      properties:
+        query_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this query (for feedback submission)
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        response_text:
+          type: string
+          description: Generated answer grounded in book content
+          example: "To create a ROS 2 publisher in Python, you need to import rclpy and create a Node subclass. According to [Module 1, Section 2], you initialize the publisher with create_publisher(msg_type, topic, queue_size)..."
+        citations:
+          type: array
+          description: List of book sections referenced in answer
+          items:
+            $ref: '#/components/schemas/Citation'
+        retrieved_chunks:
+          type: array
+          description: Debug info showing which chunks were used (optional)
+          items:
+            $ref: '#/components/schemas/ChunkInfo'
+        response_time_ms:
+          type: integer
+          description: Time taken to generate response (milliseconds)
+          example: 1250
+
+    Citation:
+      type: object
+      required:
+        - module
+        - section
+        - heading
+      properties:
+        module:
+          type: string
+          description: Module identifier
+          example: "module-1-ros2"
+        section:
+          type: string
+          description: Section identifier
+          example: "2-pubsub"
+        heading:
+          type: string
+          description: Section heading
+          example: "Publisher-Subscriber Pattern"
+        link:
+          type: string
+          format: uri
+          description: Direct link to section in book
+          example: "https://book.course.university.edu/module-1-ros2/2-pubsub"
+
+    ChunkInfo:
+      type: object
+      properties:
+        chunk_id:
+          type: string
+          format: uuid
+        similarity_score:
+          type: number
+          format: float
+          description: Cosine similarity score (0-1)
+          example: 0.89
+        text_preview:
+          type: string
+          description: First 100 characters of chunk text
+          example: "In ROS 2, publishers and subscribers communicate via topics. A publisher sends messages..."
+
+    FeedbackRequest:
+      type: object
+      required:
+        - query_id
+      properties:
+        query_id:
+          type: string
+          format: uuid
+          description: Query ID from QueryResponse
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Helpfulness rating (1=not helpful, 5=very helpful)
+          example: 4
+        comment:
+          type: string
+          maxLength: 500
+          description: Optional text feedback
+          example: "Helpful answer but could use more code examples"
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type
+          example: "RateLimitExceeded"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "You have exceeded your daily quota of 100 requests. Quota resets at midnight UTC."
+        details:
+          type: object
+          description: Additional error context
+          additionalProperties: true
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Optional API key for instructor analytics dashboard
