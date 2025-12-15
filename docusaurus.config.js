@@ -10,10 +10,11 @@ const config = {
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
-  url: 'https://ami4u87.github.io',
+  // Note: For Vercel deployment, use root URL. For GitHub Pages, use github.io URL with repo path
+  url: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://ami4u87.github.io',
   // Set the /<base>/ pathname under which your site is served
-  // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/Hackathorn-_book_Physical-AI-_or_Humanoid-Robotics-Course-latest/',
+  // For Vercel: use '/', For GitHub Pages: use '/<projectName>/'
+  baseUrl: process.env.VERCEL ? '/' : '/Hackathorn-_book_Physical-AI-_or_Humanoid-Robotics-Course-latest/',
 
   // GitHub pages deployment config.
   organizationName: 'ami4u87', // Usually your GitHub org/user name.
