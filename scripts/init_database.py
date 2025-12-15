@@ -1,15 +1,26 @@
 #!/usr/bin/env python3
 """
 Neon Postgres schema initialization script
-Creates all required tables for the application
+Creates all required tables for the Physical AI chatbot application
+
+Usage:
+    python scripts/init_database.py
+    python scripts/init_database.py --database-url "postgresql://..."
+
+Environment Variables:
+    DATABASE_URL: PostgreSQL connection string (required if not passed as argument)
 """
-import asyncpg
+import psycopg2
 import os
 import sys
 from typing import Optional
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 
-async def init_database(database_url: Optional[str] = None):
+def init_database(database_url: Optional[str] = None) -> None:
     """
     Initialize the database schema with all required tables
     """
@@ -17,127 +28,205 @@ async def init_database(database_url: Optional[str] = None):
     db_url = database_url or os.getenv("DATABASE_URL")
 
     if not db_url:
-        raise ValueError("DATABASE_URL environment variable not set")
+        print("❌ Error: DATABASE_URL not found")
+        print("   Please set DATABASE_URL in your .env file or pass --database-url argument")
+        sys.exit(1)
 
-    print(f"Connecting to database: {db_url}")
+    print(f"Connecting to database...")
 
     # Connect to the database
-    conn = await asyncpg.connect(db_url)
+    try:
+        conn = psycopg2.connect(db_url)
+        print("✅ Successfully connected to PostgreSQL database")
+    except psycopg2.OperationalError as e:
+        print(f"❌ Failed to connect to database: {e}")
+        print("\nTroubleshooting:")
+        print("1. Check DATABASE_URL in .env file")
+        print("2. Verify database is running (for local Postgres)")
+        print("3. Ensure SSL mode is correct (Neon requires sslmode=require)")
+        sys.exit(1)
+
+    cursor = conn.cursor()
 
     try:
         # Create students table
-        await conn.execute("""
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS students (
-                student_id VARCHAR(50) PRIMARY KEY,
-                jwt_secret VARCHAR(255),
+                student_id VARCHAR(255) PRIMARY KEY,
+                jwt_secret VARCHAR(512),
                 quota_daily INT DEFAULT 100,
                 quota_used_today INT DEFAULT 0,
                 last_reset DATE DEFAULT CURRENT_DATE,
-                created_at TIMESTAMP DEFAULT NOW(),
-                last_active TIMESTAMP
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                last_active TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                total_queries INTEGER DEFAULT 0,
+                is_active BOOLEAN DEFAULT TRUE
             )
         """)
-        print("✓ Created students table")
+        conn.commit()
+        print("✅ Created students table")
 
         # Create chatbot_queries table
-        await conn.execute("""
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS chatbot_queries (
-                query_id UUID PRIMARY KEY,
-                student_id VARCHAR(50) REFERENCES students(student_id),
+                query_id SERIAL PRIMARY KEY,
+                student_id VARCHAR(255) REFERENCES students(student_id) ON DELETE CASCADE,
                 query_text TEXT NOT NULL,
-                retrieved_chunks JSONB NOT NULL,
+                retrieved_chunks INTEGER DEFAULT 0,
                 response_text TEXT NOT NULL,
-                citations JSONB NOT NULL,
+                citations JSONB DEFAULT '[]'::jsonb,
                 feedback_rating INT CHECK (feedback_rating BETWEEN 1 AND 5),
                 feedback_text TEXT,
                 response_time_ms INT,
-                timestamp TIMESTAMP DEFAULT NOW()
+                model_used VARCHAR(100) DEFAULT 'gpt-4-turbo-preview',
+                tokens_used INTEGER,
+                context_module VARCHAR(255),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                flagged BOOLEAN DEFAULT FALSE
             )
         """)
-        print("✓ Created chatbot_queries table")
+        conn.commit()
+        print("✅ Created chatbot_queries table")
 
         # Create indexes for chatbot_queries
-        await conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_queries_student ON chatbot_queries(student_id);
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_queries_student ON chatbot_queries(student_id)
         """)
-        await conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_queries_timestamp ON chatbot_queries(timestamp);
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_queries_created_at ON chatbot_queries(created_at DESC)
         """)
-        print("✓ Created indexes for chatbot_queries")
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_queries_context_module ON chatbot_queries(context_module)
+        """)
+        conn.commit()
+        print("✅ Created indexes for chatbot_queries")
 
         # Create api_usage_logs table
-        await conn.execute("""
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS api_usage_logs (
                 log_id SERIAL PRIMARY KEY,
-                student_id VARCHAR(50) REFERENCES students(student_id),
-                endpoint VARCHAR(100),
-                service VARCHAR(20) CHECK (service IN ('chatbot', 'vla')),
-                request_timestamp TIMESTAMP DEFAULT NOW(),
-                response_timestamp TIMESTAMP,
-                request_tokens INT,
-                response_tokens INT,
-                cost_usd DECIMAL(10,6),
+                student_id VARCHAR(255) REFERENCES students(student_id) ON DELETE CASCADE,
+                endpoint VARCHAR(255),
+                method VARCHAR(10),
+                service VARCHAR(50) DEFAULT 'chatbot',
+                request_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                response_timestamp TIMESTAMP WITH TIME ZONE,
+                request_tokens INT DEFAULT 0,
+                response_tokens INT DEFAULT 0,
+                cost_usd DECIMAL(10,6) DEFAULT 0.0,
                 quota_remaining INT,
-                status_code INT
+                status_code INT,
+                ip_address INET,
+                user_agent TEXT
             )
         """)
-        print("✓ Created api_usage_logs table")
+        conn.commit()
+        print("✅ Created api_usage_logs table")
 
         # Create indexes for api_usage_logs
-        await conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_usage_student_date ON api_usage_logs(student_id, DATE(request_timestamp));
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_usage_student_date
+            ON api_usage_logs(student_id, DATE(request_timestamp))
         """)
-        print("✓ Created indexes for api_usage_logs")
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_usage_created_at
+            ON api_usage_logs(request_timestamp DESC)
+        """)
+        conn.commit()
+        print("✅ Created indexes for api_usage_logs")
 
         # Create exercise_submissions table
-        await conn.execute("""
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS exercise_submissions (
-                submission_id UUID PRIMARY KEY,
-                student_id VARCHAR(50) REFERENCES students(student_id),
-                exercise_id VARCHAR(100) NOT NULL,
+                submission_id SERIAL PRIMARY KEY,
+                student_id VARCHAR(255) REFERENCES students(student_id) ON DELETE CASCADE,
+                exercise_id VARCHAR(255) NOT NULL,
+                module_id VARCHAR(255),
                 validation_hash VARCHAR(64) NOT NULL,
-                timestamp TIMESTAMP DEFAULT NOW(),
+                submission_text TEXT,
+                code_files JSONB DEFAULT '{}'::jsonb,
+                submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                 is_correct BOOLEAN,
-                attempt_number INT
+                attempt_number INT DEFAULT 1,
+                validation_status VARCHAR(50) DEFAULT 'pending',
+                validation_feedback TEXT,
+                UNIQUE(student_id, exercise_id)
             )
         """)
-        print("✓ Created exercise_submissions table")
+        conn.commit()
+        print("✅ Created exercise_submissions table")
 
         # Create indexes for exercise_submissions
-        await conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_submissions_student_exercise ON exercise_submissions(student_id, exercise_id);
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_submissions_student_exercise
+            ON exercise_submissions(student_id, exercise_id)
         """)
-        print("✓ Created indexes for exercise_submissions")
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_submissions_module
+            ON exercise_submissions(module_id)
+        """)
+        conn.commit()
+        print("✅ Created indexes for exercise_submissions")
 
-        print("\nDatabase schema initialized successfully!")
+        # Verify tables were created
+        cursor.execute("""
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_type = 'BASE TABLE'
+            ORDER BY table_name
+        """)
+        tables = [row[0] for row in cursor.fetchall()]
+
+        print("\n" + "="*60)
+        print("Database schema initialized successfully!")
+        print("="*60)
         print("\nTables created:")
-        print("- students: Stores student information and quotas")
-        print("- chatbot_queries: Logs chatbot queries and responses")
-        print("- api_usage_logs: Tracks API usage for rate limiting")
-        print("- exercise_submissions: Records exercise validation attempts")
+        print("  ✅ students - Student information and quotas")
+        print("  ✅ chatbot_queries - Chatbot queries and responses")
+        print("  ✅ api_usage_logs - API usage tracking")
+        print("  ✅ exercise_submissions - Exercise validation")
+        print(f"\nTotal tables in database: {len(tables)}")
+        print("="*60)
+        print("\nNext steps:")
+        print("1. Initialize Qdrant collection: python scripts/init_qdrant.py")
+        print("2. Load course content into vector database")
+        print("3. Start backend services: cd backend && docker-compose up -d")
+        print()
 
-    except Exception as e:
-        print(f"Error initializing database: {e}")
+    except psycopg2.Error as e:
+        print(f"❌ Error initializing database: {e}")
+        conn.rollback()
         raise
     finally:
-        await conn.close()
+        cursor.close()
+        conn.close()
 
 
-def main():
+def main() -> None:
+    """Main entry point for CLI usage."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Initialize Neon Postgres schema")
-    parser.add_argument("--database-url", default=None,
-                       help="Database URL (default: from DATABASE_URL env var)")
+    parser = argparse.ArgumentParser(
+        description="Initialize PostgreSQL schema for Physical AI chatbot"
+    )
+    parser.add_argument(
+        "--database-url",
+        default=None,
+        help="Database connection string (default: from DATABASE_URL env var)"
+    )
 
     args = parser.parse_args()
 
-    # Run the async function
+    print("\n" + "="*60)
+    print("Physical AI Chatbot - Database Schema Initialization")
+    print("="*60 + "\n")
+
+    # Run the initialization
     try:
-        import asyncio
-        asyncio.run(init_database(database_url=args.database_url))
+        init_database(database_url=args.database_url)
     except Exception as e:
-        print(f"Failed to initialize database: {e}")
+        print(f"\n❌ Failed to initialize database: {e}")
         sys.exit(1)
 
 
