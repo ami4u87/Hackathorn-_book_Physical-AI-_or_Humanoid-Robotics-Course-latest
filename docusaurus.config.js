@@ -10,14 +10,14 @@ const config = {
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
-  url: 'https://your-organization.github.io',
+  url: 'https://ami4u87.github.io',
   // Set the /<base>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/physical-ai-humanoid-robotics',
+  baseUrl: '/Hackathorn-_book_Physical-AI-_or_Humanoid-Robotics-Course-latest/',
 
   // GitHub pages deployment config.
-  organizationName: 'your-organization', // Usually your GitHub org/user name.
-  projectName: 'physical-ai-humanoid-robotics', // Usually your repo name.
+  organizationName: 'ami4u87', // Usually your GitHub org/user name.
+  projectName: 'Hackathorn-_book_Physical-AI-_or_Humanoid-Robotics-Course-latest', // Usually your repo name.
   deploymentBranch: 'gh-pages', // Branch that GitHub pages will deploy from.
 
   onBrokenLinks: 'throw',
@@ -41,7 +41,7 @@ const config = {
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/your-organization/physical-ai-humanoid-robotics/tree/main/',
+            'https://github.com/ami4u87/Hackathorn-_book_Physical-AI-_or_Humanoid-Robotics-Course-latest/tree/master/',
         },
         blog: false, // Disable blog if not needed
         theme: {
@@ -70,7 +70,7 @@ const config = {
             label: 'Docs',
           },
           {
-            href: 'https://github.com/your-organization/physical-ai-humanoid-robotics',
+            href: 'https://github.com/ami4u87/Hackathorn-_book_Physical-AI-_or_Humanoid-Robotics-Course-latest',
             label: 'GitHub',
             position: 'right',
           },
@@ -106,7 +106,7 @@ const config = {
             items: [
               {
                 label: 'GitHub',
-                href: 'https://github.com/your-organization/physical-ai-humanoid-robotics',
+                href: 'https://github.com/ami4u87/Hackathorn-_book_Physical-AI-_or_Humanoid-Robotics-Course-latest',
               },
             ],
           },
