@@ -28,7 +28,7 @@ def init_database(database_url: Optional[str] = None) -> None:
     db_url = database_url or os.getenv("DATABASE_URL")
 
     if not db_url:
-        print("❌ Error: DATABASE_URL not found")
+        print("[ERROR] Error: DATABASE_URL not found")
         print("   Please set DATABASE_URL in your .env file or pass --database-url argument")
         sys.exit(1)
 
@@ -37,9 +37,9 @@ def init_database(database_url: Optional[str] = None) -> None:
     # Connect to the database
     try:
         conn = psycopg2.connect(db_url)
-        print("✅ Successfully connected to PostgreSQL database")
+        print("[OK] Successfully connected to PostgreSQL database")
     except psycopg2.OperationalError as e:
-        print(f"❌ Failed to connect to database: {e}")
+        print(f"[ERROR] Failed to connect to database: {e}")
         print("\nTroubleshooting:")
         print("1. Check DATABASE_URL in .env file")
         print("2. Verify database is running (for local Postgres)")
@@ -64,7 +64,7 @@ def init_database(database_url: Optional[str] = None) -> None:
             )
         """)
         conn.commit()
-        print("✅ Created students table")
+        print("[OK] Created students table")
 
         # Create chatbot_queries table
         cursor.execute("""
@@ -86,7 +86,7 @@ def init_database(database_url: Optional[str] = None) -> None:
             )
         """)
         conn.commit()
-        print("✅ Created chatbot_queries table")
+        print("[OK] Created chatbot_queries table")
 
         # Create indexes for chatbot_queries
         cursor.execute("""
@@ -99,7 +99,7 @@ def init_database(database_url: Optional[str] = None) -> None:
             CREATE INDEX IF NOT EXISTS idx_queries_context_module ON chatbot_queries(context_module)
         """)
         conn.commit()
-        print("✅ Created indexes for chatbot_queries")
+        print("[OK] Created indexes for chatbot_queries")
 
         # Create api_usage_logs table
         cursor.execute("""
@@ -121,19 +121,19 @@ def init_database(database_url: Optional[str] = None) -> None:
             )
         """)
         conn.commit()
-        print("✅ Created api_usage_logs table")
+        print("[OK] Created api_usage_logs table")
 
         # Create indexes for api_usage_logs
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_usage_student_date
-            ON api_usage_logs(student_id, DATE(request_timestamp))
+            CREATE INDEX IF NOT EXISTS idx_usage_student_timestamp
+            ON api_usage_logs(student_id, request_timestamp DESC)
         """)
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_usage_created_at
             ON api_usage_logs(request_timestamp DESC)
         """)
         conn.commit()
-        print("✅ Created indexes for api_usage_logs")
+        print("[OK] Created indexes for api_usage_logs")
 
         # Create exercise_submissions table
         cursor.execute("""
@@ -154,7 +154,7 @@ def init_database(database_url: Optional[str] = None) -> None:
             )
         """)
         conn.commit()
-        print("✅ Created exercise_submissions table")
+        print("[OK] Created exercise_submissions table")
 
         # Create indexes for exercise_submissions
         cursor.execute("""
@@ -166,7 +166,7 @@ def init_database(database_url: Optional[str] = None) -> None:
             ON exercise_submissions(module_id)
         """)
         conn.commit()
-        print("✅ Created indexes for exercise_submissions")
+        print("[OK] Created indexes for exercise_submissions")
 
         # Verify tables were created
         cursor.execute("""
@@ -182,10 +182,10 @@ def init_database(database_url: Optional[str] = None) -> None:
         print("Database schema initialized successfully!")
         print("="*60)
         print("\nTables created:")
-        print("  ✅ students - Student information and quotas")
-        print("  ✅ chatbot_queries - Chatbot queries and responses")
-        print("  ✅ api_usage_logs - API usage tracking")
-        print("  ✅ exercise_submissions - Exercise validation")
+        print("  [OK] students - Student information and quotas")
+        print("  [OK] chatbot_queries - Chatbot queries and responses")
+        print("  [OK] api_usage_logs - API usage tracking")
+        print("  [OK] exercise_submissions - Exercise validation")
         print(f"\nTotal tables in database: {len(tables)}")
         print("="*60)
         print("\nNext steps:")
@@ -195,7 +195,7 @@ def init_database(database_url: Optional[str] = None) -> None:
         print()
 
     except psycopg2.Error as e:
-        print(f"❌ Error initializing database: {e}")
+        print(f"[ERROR] Error initializing database: {e}")
         conn.rollback()
         raise
     finally:
@@ -226,7 +226,7 @@ def main() -> None:
     try:
         init_database(database_url=args.database_url)
     except Exception as e:
-        print(f"\n❌ Failed to initialize database: {e}")
+        print(f"\n[ERROR] Failed to initialize database: {e}")
         sys.exit(1)
 
 
