@@ -32,8 +32,10 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from backend/.env
+from pathlib import Path
+dotenv_path = Path(__file__).parent.parent / "backend" / ".env"
+load_dotenv(dotenv_path=dotenv_path)
 
 try:
     import tiktoken
