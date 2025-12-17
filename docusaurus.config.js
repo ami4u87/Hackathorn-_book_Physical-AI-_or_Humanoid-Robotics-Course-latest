@@ -11,7 +11,7 @@ const isGitHubPages = process.env.GITHUB_PAGES === 'true' || process.env.USE_GIT
 const config = {
   title: 'Physical AI & Humanoid Robotics',
   tagline: 'A comprehensive course on embodied intelligence and humanoid robotics',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/favicon.svg',
 
   // Set the production url of your site here
   // Vercel (production) vs GitHub Pages (preview)
