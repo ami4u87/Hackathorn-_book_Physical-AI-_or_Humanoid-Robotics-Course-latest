@@ -24,6 +24,11 @@ module.exports = {
       label: 'Module 2: Simulation Environments',
       items: [
         'module-2-simulation/index',
+        'module-2-simulation/1-gazebo',
+        'module-2-simulation/2-unity',
+        'module-2-simulation/3-isaac',
+        'module-2-simulation/4-physics',
+        'module-2-simulation/exercises'
       ],
     },
     {
@@ -31,6 +36,12 @@ module.exports = {
       label: 'Module 3: Perception & Control',
       items: [
         'module-3-perception/index',
+        'module-3-perception/1-vision-depth',
+        'module-3-perception/2-object-detection',
+        'module-3-perception/3-pose-tf',
+        'module-3-perception/4-rviz',
+        'module-3-perception/5-control-integration',
+        'module-3-perception/exercises'
       ],
     },
     {
@@ -38,6 +49,12 @@ module.exports = {
       label: 'Module 4: Vision-Language-Action',
       items: [
         'module-4-vla/index',
+        'module-4-vla/1-gpt4-vision',
+        'module-4-vla/2-multimodal',
+        'module-4-vla/3-action-sequences',
+        'module-4-vla/4-validation',
+        'module-4-vla/5-ambiguity',
+        'module-4-vla/exercises'
       ],
     },
     {
@@ -45,6 +62,9 @@ module.exports = {
       label: 'Module 5: Capstone Project',
       items: [
         'module-5-capstone/index',
+        'module-5-capstone/1-integration',
+        'module-5-capstone/2-voice-interface',
+        'module-5-capstone/3-final-demo'
       ],
     },
   ],
