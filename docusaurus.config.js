@@ -3,6 +3,10 @@
 // @ts-ignore
 const { themes } = require('prism-react-renderer');
 
+// Deployment configuration
+// Use environment variable to switch between Vercel (production) and GitHub Pages (preview)
+const isGitHubPages = process.env.GITHUB_PAGES === 'true' || process.env.USE_GITHUB_PAGES === 'true';
+
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'Physical AI & Humanoid Robotics',
@@ -10,10 +14,16 @@ const config = {
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
-  url: 'https://hackathorn-book-physical-ai-or-huma-ebon.vercel.app',
+  // Vercel (production) vs GitHub Pages (preview)
+  url: isGitHubPages
+    ? 'https://ami4u87.github.io'
+    : 'https://hackathorn-book-physical-ai-or-huma-ebon.vercel.app',
+
   // Set the /<base>/ pathname under which your site is served
-  // For Vercel deployment, always use root path
-  baseUrl: '/',
+  // For Vercel: root path, For GitHub Pages: repo name
+  baseUrl: isGitHubPages
+    ? '/Hackathorn-_book_Physical-AI-_or_Humanoid-Robotics-Course-latest/'
+    : '/',
 
   // GitHub pages deployment config.
   organizationName: 'ami4u87', // Usually your GitHub org/user name.
@@ -22,6 +32,11 @@ const config = {
 
   onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
+
+  // Custom environment variables
+  customFields: {
+    chatbotApiUrl: process.env.CHATBOT_API_URL || 'http://localhost:8000',
+  },
 
   // Even if you don't use internalization, you can use this field to set useful
   // metadata like html lang. For example, if your site is Chinese, you may want
