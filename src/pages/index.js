@@ -6,18 +6,42 @@ import Layout from '@theme/Layout';
 import styles from './index.module.css';
 
 function HomepageHeader() {
-  const {siteConfig} = useDocusaurusContext();
   return (
     <header className={clsx('hero hero--primary', styles.heroBanner)}>
-      <div className="container">
-        <h1 className="hero__title">{siteConfig.title}</h1>
-        <p className="hero__subtitle">{siteConfig.tagline}</p>
-        <div className={styles.buttons}>
-          <Link
-            className="button button--secondary button--lg"
-            to="/docs/intro">
-            Get Started →
-          </Link>
+      <div className={styles.heroBackground}></div>
+      <div className={clsx('container', styles.heroContainer)}>
+        <div className={styles.heroContent}>
+          <h1 className={styles.heroTitle}>Build the Future of Intelligent Machines</h1>
+          <p className={styles.heroSubtitle}>
+            Master Physical AI and Humanoid Robotics with hands-on projects,
+            simulation tools, and real-world robotics workflows — from fundamentals to advanced systems.
+          </p>
+          <div className={styles.buttons}>
+            <Link
+              className="button button--primary button--lg"
+              to="/docs/intro">
+              Start Learning
+            </Link>
+            <Link
+              className={clsx('button button--outline button--secondary button--lg', styles.buttonSecondary)}
+              to="/docs/intro">
+              View Curriculum
+            </Link>
+          </div>
+          <div className={styles.trustElements}>
+            <span className={styles.trustBadge}>🤖 Hands-on ROS 2 Projects</span>
+            <span className={styles.trustBadge}>🎯 Industry-Standard Tools</span>
+            <span className={styles.trustBadge}>🚀 From Basics to Advanced</span>
+          </div>
+        </div>
+        <div className={styles.heroImageContainer}>
+          <div className={styles.heroImagePlaceholder}>
+            <img
+              src="/img/robot-hero.png"
+              alt="Advanced Humanoid Robot"
+              className={styles.heroImage}
+            />
+          </div>
         </div>
       </div>
     </header>
@@ -27,6 +51,7 @@ function HomepageHeader() {
 function HomepageFeatures() {
   const features = [
     {
+      icon: '⚙️',
       title: 'ROS 2 Fundamentals',
       description: (
         <>
@@ -36,6 +61,7 @@ function HomepageFeatures() {
       ),
     },
     {
+      icon: '🎮',
       title: 'Simulation Environments',
       description: (
         <>
@@ -45,6 +71,7 @@ function HomepageFeatures() {
       ),
     },
     {
+      icon: '🧠',
       title: 'Vision-Language-Action Models',
       description: (
         <>
@@ -58,12 +85,19 @@ function HomepageFeatures() {
   return (
     <section className={styles.features}>
       <div className="container">
+        <div className={styles.featuresHeader}>
+          <h2 className={styles.featuresTitle}>What You'll Learn</h2>
+          <p className={styles.featuresSubtitle}>
+            Build production-ready robotics skills through hands-on projects
+          </p>
+        </div>
         <div className="row">
           {features.map((feature, idx) => (
             <div key={idx} className={clsx('col col--4')}>
-              <div className="text--center padding-horiz--md">
-                <h3>{feature.title}</h3>
-                <p>{feature.description}</p>
+              <div className={styles.featureCard}>
+                <div className={styles.featureIcon}>{feature.icon}</div>
+                <h3 className={styles.featureTitle}>{feature.title}</h3>
+                <p className={styles.featureDescription}>{feature.description}</p>
               </div>
             </div>
           ))}

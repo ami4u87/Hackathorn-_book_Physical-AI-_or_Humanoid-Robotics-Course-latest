@@ -28,7 +28,7 @@ export default function ChatbotWidget({ apiUrl }: ChatbotWidgetProps) {
     {
       id: '0',
       type: 'bot',
-      text: 'Hi! I\'m your Physical AI course assistant. Ask me anything about the course content!',
+      text: 'Welcome to your Physical AI & Humanoid Robotics course guide! I can help you navigate the curriculum, explain concepts, and answer questions about ROS 2, simulation, and VLA models. What would you like to learn about?',
       timestamp: new Date(),
     }
   ]);
@@ -120,7 +120,7 @@ export default function ChatbotWidget({ apiUrl }: ChatbotWidgetProps) {
         onClick={() => setIsOpen(!isOpen)}
         aria-label={isOpen ? 'Close chat' : 'Open chat'}
       >
-        {isOpen ? '✕' : '💬'}
+        {isOpen ? '✕' : '📚'}
       </button>
 
       {/* Chat Window */}
@@ -128,7 +128,10 @@ export default function ChatbotWidget({ apiUrl }: ChatbotWidgetProps) {
         <div className={styles.chatWindow}>
           {/* Header */}
           <div className={styles.chatHeader}>
-            <h3>Course Assistant</h3>
+            <div className={styles.headerContent}>
+              <span className={styles.headerIcon}>📚</span>
+              <h3>Course Guide</h3>
+            </div>
             <button
               className={styles.closeButton}
               onClick={() => setIsOpen(false)}
