@@ -9,6 +9,12 @@ from typing import List, Dict, Any, Optional
 import os
 from datetime import datetime
 import asyncio
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from backend/.env
+dotenv_path = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(dotenv_path=dotenv_path)
 
 # Import local modules
 import sys
@@ -16,8 +22,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from shared.models import ChatbotQuery
 from chatbot.src.models.chunk import Chunk, ChunkMetadata
 
-# OpenAI and database clients
-from openai import AsyncOpenAI
+# Embedding and database clients
+from sentence_transformers import SentenceTransformer
+import google.generativeai as genai
 from qdrant_client import QdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue
 
@@ -37,7 +44,8 @@ app.add_middleware(
 )
 
 # Initialize clients
-openai_client = None
+embedding_model = None
+gemini_model = None
 qdrant_client = None
 
 class QueryRequest(BaseModel):
@@ -54,24 +62,39 @@ class QueryResponse(BaseModel):
 @app.on_event("startup")
 async def startup_event():
     """Initialize database connections on startup"""
-    global openai_client, qdrant_client
+    global embedding_model, gemini_model, qdrant_client
 
-    # Initialize OpenAI client
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY environment variable not set")
-    openai_client = AsyncOpenAI(api_key=api_key)
+    # Initialize Sentence-Transformers model (local, no API cost)
+    print("Loading sentence-transformers model...")
+    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')  # 384-dim
+    print("[OK] Embedding model loaded")
+
+    # Initialize Gemini API
+    api_key = os.getenv("GEMINI_API_KEY")
+    if api_key:
+        genai.configure(api_key=api_key)
+        gemini_model = genai.GenerativeModel('models/gemini-2.5-flash')
+        print("[OK] Using Google Gemini 2.5 Flash for response generation")
+    else:
+        print("[WARN] No GEMINI_API_KEY found in environment variables")
+        print("   Add GEMINI_API_KEY to backend/.env")
 
     # Initialize Qdrant client
     qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
     qdrant_api_key = os.getenv("QDRANT_API_KEY")
 
-    if qdrant_api_key:
+    if qdrant_url == ":memory:" or (qdrant_url and not qdrant_url.startswith("http")):
+        # Use local file-based storage
+        qdrant_client = QdrantClient(path=qdrant_url if qdrant_url != ":memory:" else "./qdrant_storage")
+        print(f"[OK] Using local Qdrant at {qdrant_url}")
+    elif qdrant_api_key:
         qdrant_client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
+        print(f"[OK] Connected to Qdrant Cloud")
     else:
         qdrant_client = QdrantClient(url=qdrant_url)
+        print(f"[OK] Connected to Qdrant at {qdrant_url}")
 
-    print("✅ Chatbot service initialized")
+    print("[OK] Chatbot service initialized")
 
 @app.get("/health")
 async def health_check():
@@ -90,20 +113,16 @@ async def query_chatbot(request: QueryRequest):
     start_time = datetime.utcnow()
 
     try:
-        # 1. Generate embedding for the query
-        embedding_response = await openai_client.embeddings.create(
-            model="text-embedding-3-large",
-            input=request.query
-        )
-        query_embedding = embedding_response.data[0].embedding
+        # 1. Generate embedding for the query (local, no API cost)
+        query_embedding = embedding_model.encode(request.query, convert_to_tensor=False).tolist()
 
         # 2. Retrieve relevant chunks from Qdrant
-        search_results = qdrant_client.search(
-            collection_name="book_chunks",
-            query_vector=query_embedding,
+        search_results = qdrant_client.query_points(
+            collection_name="physical_ai_course",
+            query=query_embedding,
             limit=5,  # Top 5 most relevant chunks
             with_payload=True
-        )
+        ).points
 
         # 3. Format retrieved context
         context_parts = []
@@ -121,12 +140,12 @@ async def query_chatbot(request: QueryRequest):
                 "module": module_id,
                 "section": section_id,
                 "heading": heading,
-                "similarity": round(result.score, 3)
+                "similarity": str(round(result.score, 3))
             })
 
         context = "\n\n".join(context_parts)
 
-        # 4. Generate grounded response using GPT-4
+        # 4. Generate grounded response using Gemini
         system_prompt = """You are an expert AI teaching assistant for the Physical AI & Humanoid Robotics course.
 
 CRITICAL RULES:
@@ -141,17 +160,13 @@ Course Content:
 
         user_prompt = f"Student Question: {request.query}\n\nPlease provide a clear, educational answer based ONLY on the course content provided above."
 
-        completion = await openai_client.chat.completions.create(
-            model="gpt-4-turbo-preview",
-            messages=[
-                {"role": "system", "content": system_prompt.format(context=context)},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.1,  # Low temperature for consistency
-            max_tokens=500
-        )
-
-        response_text = completion.choices[0].message.content
+        # Use Gemini API
+        if gemini_model:
+            prompt = f"{system_prompt.format(context=context)}\n\n{user_prompt}"
+            response = await asyncio.to_thread(gemini_model.generate_content, prompt)
+            response_text = response.text
+        else:
+            response_text = "Error: No Gemini API key configured. Please add GEMINI_API_KEY to backend/.env"
 
         # 5. Calculate response time
         end_time = datetime.utcnow()
@@ -172,7 +187,7 @@ async def get_stats():
     """Get chatbot statistics"""
     try:
         # Get collection info from Qdrant
-        collection_info = qdrant_client.get_collection("book_chunks")
+        collection_info = qdrant_client.get_collection("physical_ai_course")
 
         return {
             "total_chunks": collection_info.points_count,

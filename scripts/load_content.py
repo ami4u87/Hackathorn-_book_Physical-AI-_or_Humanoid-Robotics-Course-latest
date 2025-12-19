@@ -39,13 +39,13 @@ load_dotenv(dotenv_path=dotenv_path)
 
 try:
     import tiktoken
-    from openai import OpenAI
+    from sentence_transformers import SentenceTransformer
     from qdrant_client import QdrantClient
     from qdrant_client.models import PointStruct, Distance, VectorParams
 except ImportError as e:
     print(f"[ERROR] Missing required package: {e}")
     print("\nPlease install required packages:")
-    print("  pip install --user openai tiktoken qdrant-client python-dotenv")
+    print("  pip install --user sentence-transformers tiktoken qdrant-client python-dotenv")
     sys.exit(1)
 
 
@@ -224,35 +224,31 @@ class ContentLoader:
         self.collection_name = collection_name
         self.chunker = ContentChunker(max_tokens=chunk_size, overlap_tokens=overlap)
 
-        # Initialize OpenAI client
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key or api_key == "sk-your-api-key-here":
-            print("[ERROR] OPENAI_API_KEY not set in environment")
-            print("Please add your OpenAI API key to backend/.env")
-            sys.exit(1)
-
-        self.openai_client = OpenAI(api_key=api_key)
+        # Initialize Sentence-Transformers model (free, runs locally)
+        print("[INFO] Loading sentence-transformers model (this may take a moment on first run)...")
+        self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')  # 384-dim, fast and efficient
+        print(f"[OK] Model loaded: all-MiniLM-L6-v2 (384 dimensions)")
 
         # Initialize Qdrant client
         qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
         qdrant_api_key = os.getenv("QDRANT_API_KEY")
 
-        if qdrant_api_key:
+        if qdrant_url == ":memory:" or (qdrant_url and not qdrant_url.startswith("http")):
+            # Use local file-based storage
+            self.qdrant_client = QdrantClient(path=qdrant_url if qdrant_url != ":memory:" else "./qdrant_storage")
+            print(f"[OK] Connected to local Qdrant at {qdrant_url}")
+        elif qdrant_api_key:
             self.qdrant_client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
+            print(f"[OK] Connected to Qdrant at: {qdrant_url}")
         else:
             self.qdrant_client = QdrantClient(url=qdrant_url)
-
-        print(f"[OK] Connected to Qdrant at: {qdrant_url}")
+            print(f"[OK] Connected to Qdrant at: {qdrant_url}")
 
     def generate_embedding(self, text: str) -> List[float]:
-        """Generate embedding using OpenAI text-embedding-3-large."""
+        """Generate embedding using Sentence-Transformers (local, no API needed)."""
         try:
-            response = self.openai_client.embeddings.create(
-                model="text-embedding-3-large",
-                input=text,
-                encoding_format="float"
-            )
-            return response.data[0].embedding
+            embedding = self.embedding_model.encode(text, convert_to_tensor=False)
+            return embedding.tolist()
         except Exception as e:
             print(f"[ERROR] Failed to generate embedding: {e}")
             raise

@@ -21,12 +21,14 @@ Environment Variables:
 import os
 import sys
 from typing import Optional
+from pathlib import Path
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from backend/.env
+dotenv_path = Path(__file__).parent.parent / "backend" / ".env"
+load_dotenv(dotenv_path=dotenv_path)
 
 
 def init_qdrant_collection(
@@ -53,13 +55,18 @@ def init_qdrant_collection(
 
     # Initialize client with error handling
     try:
-        if qdrant_api_key:
+        if qdrant_url == ":memory:" or (qdrant_url and not qdrant_url.startswith("http")):
+            # Use local file-based storage
+            client = QdrantClient(path=qdrant_url if qdrant_url != ":memory:" else "./qdrant_storage")
+            print(f"[OK] Successfully connected to local Qdrant at {qdrant_url}")
+        elif qdrant_api_key:
             client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
+            print("[OK] Successfully connected to Qdrant Cloud")
         else:
             client = QdrantClient(url=qdrant_url)
-        print("✅ Successfully connected to Qdrant")
+            print("[OK] Successfully connected to Qdrant")
     except Exception as e:
-        print(f"❌ Failed to connect to Qdrant: {e}")
+        print(f"[ERROR] Failed to connect to Qdrant: {e}")
         print("\nTroubleshooting:")
         print("1. Check QDRANT_URL in .env file")
         print("2. Verify Qdrant is running:")
@@ -75,24 +82,24 @@ def init_qdrant_collection(
             col.name == collection_name for col in existing_collections.collections
         )
     except Exception as e:
-        print(f"❌ Error checking collections: {e}")
+        print(f"[ERROR] Error checking collections: {e}")
         sys.exit(1)
 
     # Create or recreate collection
     try:
         if collection_exists:
-            print(f"⚠️  Collection '{collection_name}' already exists")
+            print(f"[WARN]  Collection '{collection_name}' already exists")
             print("   Recreating with fresh configuration...")
         else:
             print(f"Creating new collection '{collection_name}'...")
 
         client.recreate_collection(
             collection_name=collection_name,
-            vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
+            vectors_config=VectorParams(size=384, distance=Distance.COSINE),  # 384 for all-MiniLM-L6-v2
         )
-        print(f"✅ Collection '{collection_name}' created successfully")
+        print(f"[OK] Collection '{collection_name}' created successfully")
     except Exception as e:
-        print(f"❌ Failed to create collection: {e}")
+        print(f"[ERROR] Failed to create collection: {e}")
         sys.exit(1)
 
     # Verify collection was created
@@ -107,7 +114,7 @@ def init_qdrant_collection(
         print(f"  Points Count: {collection_info.points_count}")
         print("="*60)
     except Exception as e:
-        print(f"⚠️  Warning: Could not verify collection: {e}")
+        print(f"[WARN]  Warning: Could not verify collection: {e}")
 
     # Document expected payload schema
     payload_schema = {
@@ -174,7 +181,7 @@ def main() -> None:
             collection_name=args.collection
         )
     except Exception as e:
-        print(f"\n❌ Failed to initialize Qdrant collection: {e}")
+        print(f"\n[ERROR] Failed to initialize Qdrant collection: {e}")
         sys.exit(1)
 
 
