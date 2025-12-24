@@ -7,21 +7,21 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy requirements first for better caching
+COPY backend/chatbot/requirements.txt ./chatbot/
+RUN pip install --no-cache-dir -r chatbot/requirements.txt
 
-# Copy shared models
-COPY ../shared /app/shared
+# Copy shared modules
+COPY backend/shared/ ./shared/
 
-# Copy application code
-COPY . /app/chatbot
+# Copy chatbot application code
+COPY backend/chatbot/ ./chatbot/
 
-# Set Python path
+# Set Python path to /app so imports work
 ENV PYTHONPATH=/app
 
-# Expose port
+# Expose port (Railway will set PORT env var)
 EXPOSE 8000
 
-# Run the application
-CMD ["uvicorn", "chatbot.src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application (Railway will inject $PORT)
+CMD uvicorn chatbot.src.main:app --host 0.0.0.0 --port ${PORT:-8000}

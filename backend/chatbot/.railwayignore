@@ -1,0 +1,10 @@
+qdrant_storage/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+venv/
+*.log
+.DS_Store
