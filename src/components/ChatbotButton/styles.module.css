@@ -1,0 +1,150 @@
+.floatingButton {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 50px;
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  animation: float 3s ease-in-out infinite;
+}
+
+.floatingButton:hover {
+  transform: translateY(-4px) scale(1.05);
+  box-shadow: 0 12px 32px rgba(102, 126, 234, 0.6);
+  text-decoration: none;
+  color: white;
+}
+
+.floatingButton:active {
+  transform: translateY(-2px) scale(1.02);
+}
+
+.iconWrapper {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  padding: 4px;
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  color: white;
+}
+
+.label {
+  white-space: nowrap;
+  font-size: 0.95rem;
+  letter-spacing: 0.3px;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* Pulse animation on first load */
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+  }
+  50% {
+    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.8);
+  }
+}
+
+.floatingButton:not(:hover) {
+  animation: float 3s ease-in-out infinite, pulse 2s ease-in-out infinite;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .floatingButton {
+    bottom: 1.5rem;
+    right: 1.5rem;
+    padding: 0.875rem 1.25rem;
+    font-size: 0.9rem;
+  }
+
+  .iconWrapper {
+    width: 24px;
+    height: 24px;
+  }
+
+  .icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .label {
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Show only icon on very small screens */
+  .label {
+    display: none;
+  }
+
+  .floatingButton {
+    padding: 1rem;
+    border-radius: 50%;
+    width: 56px;
+    height: 56px;
+    justify-content: center;
+  }
+
+  .iconWrapper {
+    width: 32px;
+    height: 32px;
+    background: none;
+  }
+
+  .icon {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* Dark mode support */
+[data-theme='dark'] .floatingButton {
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4);
+}
+
+[data-theme='dark'] .floatingButton:hover {
+  box-shadow: 0 12px 32px rgba(124, 58, 237, 0.6);
+}
+
+[data-theme='dark'] .floatingButton:not(:hover) {
+  animation: float 3s ease-in-out infinite, pulseDark 2s ease-in-out infinite;
+}
+
+@keyframes pulseDark {
+  0%, 100% {
+    box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4);
+  }
+  50% {
+    box-shadow: 0 8px 32px rgba(124, 58, 237, 0.8);
+  }
+}
