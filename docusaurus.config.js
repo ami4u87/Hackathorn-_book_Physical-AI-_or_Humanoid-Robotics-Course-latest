@@ -85,6 +85,11 @@ const config = {
             label: 'Docs',
           },
           {
+            to: '/chatbot',
+            position: 'left',
+            label: '🤖 AI Chatbot',
+          },
+          {
             href: 'https://github.com/ami4u87/Hackathorn-_book_Physical-AI-_or_Humanoid-Robotics-Course-latest',
             label: 'GitHub',
             position: 'right',

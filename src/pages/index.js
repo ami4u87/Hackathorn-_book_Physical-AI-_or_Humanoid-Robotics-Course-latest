@@ -27,6 +27,11 @@ function HomepageHeader() {
               to="/docs/intro">
               View Curriculum
             </Link>
+            <Link
+              className={clsx('button button--success button--lg', styles.buttonChatbot)}
+              to="/chatbot">
+              🤖 Ask AI Assistant
+            </Link>
           </div>
           <div className={styles.trustElements}>
             <span className={styles.trustBadge}>🤖 Hands-on ROS 2 Projects</span>
