@@ -17,3 +17,15 @@ Thumbs.db
 node_modules/
 __pycache__/
 *.pyc
+
+# Build artifacts
+.docusaurus/
+build/
+
+# Database storage
+qdrant_storage/
+
+# Python virtual environments
+venv/
+env/
+.venv/
